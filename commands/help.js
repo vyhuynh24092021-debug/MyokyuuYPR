@@ -200,4 +200,32 @@ module.exports = {
             return `${minutes}m`;
         }
     }
+    async executePrefix(message, args, client) {
+        try {
+            const guildId = message.guild.id;
+            const prefix = config.bot.prefix;
+
+            const embed = new EmbedBuilder()
+                .setTitle('🎵 MyokyuuYPR - Help')
+                .setDescription('Bot nhạc Discord')
+                .setColor(config.bot.embedColor)
+                .setThumbnail(client.user.displayAvatarURL())
+                .addFields({
+                    name: '📋 Lệnh',
+                    value: [
+                        `\`${prefix}play <tên bài/link>\` - Phát nhạc`,
+                        `\`${prefix}search <tên bài>\` - Tìm kiếm`,
+                        `\`${prefix}nowplaying\` - Bài đang phát`,
+                        `\`${prefix}help\` - Trợ giúp`
+                    ].join('\n')
+                })
+                .setTimestamp();
+
+            await message.reply({ embeds: [embed] });
+
+        } catch (error) {
+            console.error(error);
+            message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
 };
