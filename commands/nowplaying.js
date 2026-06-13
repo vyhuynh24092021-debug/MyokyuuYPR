@@ -250,4 +250,46 @@ module.exports = {
         };
         return emojis[platform] || '🎵';
     }
+    async executePrefix(message, args, client) {
+        try {
+            const guild = message.guild;
+            const guildId = guild.id;
+
+            const player = client.players.get(guild.id);
+            if (!player) return message.reply('❌ Bot chưa phát nhạc!');
+            if (!player.currentTrack) return message.reply('❌ Không có bài nào đang phát!');
+
+            const track = player.currentTrack;
+            const currentTime = player.getCurrentTime();
+            const status = player.getStatus();
+
+            const embed = new EmbedBuilder()
+                .setTitle('🎵 Đang phát')
+                .setDescription(`**[${track.title}](${track.url})**`)
+                .setColor(config.bot.embedColor)
+                .setTimestamp();
+
+            if (track.artist) embed.addFields({ name: 'Nghệ sĩ', value: track.artist, inline: true });
+            if (track.thumbnail) embed.setThumbnail(track.thumbnail);
+
+            if (track.duration && track.duration > 0) {
+                const progressBar = this.createProgressBar(currentTime, track.duration * 1000);
+                embed.addFields({
+                    name: 'Tiến độ',
+                    value: `${this.formatTime(currentTime)} / ${this.formatDuration(track.duration)}\n${progressBar}`,
+                    inline: false
+                });
+            }
+
+            let statusText = status.playing ? '▶️ Đang phát' : '⏸️ Tạm dừng';
+            statusText += ` • 🔊 ${status.volume}%`;
+            embed.addFields({ name: 'Trạng thái', value: statusText, inline: false });
+
+            await message.reply({ embeds: [embed] });
+
+        } catch (error) {
+            console.error(error);
+            message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
 };
