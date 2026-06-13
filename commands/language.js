@@ -183,4 +183,54 @@ module.exports = {
             }
         }
     }
+    async executePrefix(message, args, client) {
+        try {
+            if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                return message.reply('❌ Bạn cần quyền **Quản lý Server** để dùng lệnh này!');
+            }
+
+            const guildId = message.guild.id;
+            const languagesPath = path.join(__dirname, '..', 'languages');
+            const languageFiles = fs.readdirSync(languagesPath).filter(file => file.endsWith('.json'));
+
+            const languages = [];
+            for (const file of languageFiles) {
+                const langData = JSON.parse(fs.readFileSync(path.join(languagesPath, file), 'utf8'));
+                languages.push({
+                    code: langData.language.code,
+                    name: langData.language.name,
+                    flag: langData.language.flag
+                });
+            }
+
+            const langList = languages.map((l, i) => `${i + 1}. ${l.flag} ${l.name} (\`${l.code}\`)`).join('\n');
+
+            const embed = new EmbedBuilder()
+                .setTitle('🌐 Chọn ngôn ngữ')
+                .setDescription(`${langList}\n\nGõ mã ngôn ngữ (ví dụ: \`vi\`, \`en\`) trong 30 giây`)
+                .setColor('#0099ff')
+                .setTimestamp();
+
+            await message.reply({ embeds: [embed] });
+
+            const filter = m => m.author.id === message.author.id;
+            const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
+
+            collector.on('collect', async m => {
+                const selected = languages.find(l => l.code === m.content.toLowerCase());
+                if (!selected) return m.reply('❌ Mã ngôn ngữ không hợp lệ!');
+
+                await LanguageManager.setServerLanguage(guildId, selected.code);
+                m.reply(`✅ Đã đổi ngôn ngữ sang **${selected.flag} ${selected.name}**!`);
+            });
+
+            collector.on('end', (collected) => {
+                if (collected.size === 0) message.channel.send('⏰ Hết thời gian!');
+            });
+
+        } catch (error) {
+            console.error(error);
+            message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
 };
