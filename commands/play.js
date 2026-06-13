@@ -207,4 +207,55 @@ module.exports = {
             return 'youtube'; // Default to YouTube search
         }
     }
+async executePrefix(message, args, client) {
+        try {
+            const query = args.join(' ');
+            if (!query) return message.reply('❌ Vui lòng nhập tên bài hát!');
+
+            const member = message.member;
+            const guild = message.guild;
+            const channel = message.channel;
+
+            if (!member.voice.channel) {
+                return message.reply('❌ Bạn cần vào voice channel trước!');
+            }
+
+            const permissions = member.voice.channel.permissionsFor(guild.members.me);
+            if (!permissions.has(PermissionFlagsBits.Connect) || !permissions.has(PermissionFlagsBits.Speak)) {
+                return message.reply('❌ Bot không có quyền vào voice channel!');
+            }
+
+            const botVoiceChannel = guild.members.me.voice.channel;
+            if (botVoiceChannel && botVoiceChannel.id !== member.voice.channel.id) {
+                return message.reply('❌ Bạn cần vào cùng kênh với bot!');
+            }
+
+            let player = client.players.get(guild.id);
+            if (!player) {
+                player = new MusicPlayer(guild, channel, member.voice.channel);
+                client.players.set(guild.id, player);
+            }
+            player.voiceChannel = member.voice.channel;
+            player.textChannel = channel;
+
+            const searchMsg = await message.reply('🔍 Đang tìm kiếm...');
+            const trackData = await this.getTrackData(query, guild.id);
+
+            if (!trackData.success) {
+                return searchMsg.edit(trackData.message);
+            }
+
+            if (!client.musicEmbedManager) {
+                client.musicEmbedManager = new MusicEmbedManager(client);
+            }
+
+            await client.musicEmbedManager.handleMusicData(
+                guild.id, trackData, member, message
+            );
+
+        } catch (error) {
+            console.error(error);
+            message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
 };
