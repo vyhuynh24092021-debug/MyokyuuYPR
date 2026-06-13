@@ -183,4 +183,89 @@ module.exports = {
             return `${minutes}:${secs.toString().padStart(2, '0')}`;
         }
     }
+    async executePrefix(message, args, client) {
+        try {
+            const query = args.join(' ');
+            if (!query) return message.reply('❌ Vui lòng nhập tên bài hát!');
+
+            const member = message.member;
+            const guild = message.guild;
+            const guildId = guild.id;
+
+            if (!member.voice.channel) return message.reply('❌ Bạn cần vào voice channel trước!');
+
+            const permissions = member.voice.channel.permissionsFor(guild.members.me);
+            if (!permissions.has(PermissionFlagsBits.Connect) || !permissions.has(PermissionFlagsBits.Speak)) {
+                return message.reply('❌ Bot không có quyền vào voice channel!');
+            }
+
+            const searchMsg = await message.reply('🔍 Đang tìm kiếm...');
+            const results = await YouTube.search(query, 9, guildId);
+
+            if (!results || results.length === 0) {
+                return searchMsg.edit('❌ Không tìm thấy kết quả!');
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🔍 Kết quả: ${query}`)
+                .setColor(config.bot.embedColor)
+                .setDescription('Chọn bài bằng cách gõ số (1-9) trong 30 giây')
+                .setTimestamp();
+
+            const maxResults = Math.min(results.length, 9);
+            for (let i = 0; i < maxResults; i++) {
+                const r = results[i];
+                embed.addFields({
+                    name: `${i + 1}. ${r.title}`,
+                    value: `${r.artist || 'Unknown'} • ${this.formatDuration(r.duration)}`,
+                    inline: false
+                });
+            }
+
+            await searchMsg.edit({ content: '', embeds: [embed] });
+
+            // Chờ người dùng chọn số
+            const filter = m => m.author.id === message.author.id && /^[1-9]$/.test(m.content);
+            const collector = message.channel.createMessageCollector({ filter, time: 30000, max: 1 });
+
+            collector.on('collect', async m => {
+                const index = parseInt(m.content) - 1;
+                if (index >= maxResults) return m.reply('❌ Số không hợp lệ!');
+
+                const selected = results[index];
+                await m.reply(`▶️ Đang thêm: **${selected.title}**`);
+
+                let player = client.players.get(guild.id);
+                if (!player) {
+                    const MusicPlayer = require('../src/MusicPlayer');
+                    player = new MusicPlayer(guild, message.channel, member.voice.channel);
+                    client.players.set(guild.id, player);
+                }
+                player.voiceChannel = member.voice.channel;
+                player.textChannel = message.channel;
+
+                const MusicEmbedManager = require('../src/MusicEmbedManager');
+                if (!client.musicEmbedManager) {
+                    client.musicEmbedManager = new MusicEmbedManager(client);
+                }
+
+                await client.musicEmbedManager.handleMusicData(
+                    guild.id,
+                    { success: true, isPlaylist: false, tracks: [selected] },
+                    member,
+                    message
+                );
+            });
+
+            collector.on('end', (collected) => {
+                if (collected.size === 0) {
+                    searchMsg.edit({ content: '⏰ Hết thời gian chọn!', embeds: [] });
+                }
+            });
+
+        } catch (error) {
+            console.error(error);
+            message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
 };
