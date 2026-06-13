@@ -247,7 +247,24 @@ setTimeout(() => {
         await cleanupAudioCache();
         console.log(chalk.green(`[SHARD ${client.shard?.ids?.[0] ?? 'N/A'}] ✅ Session restore complete`));
     };
+// Handle prefix commands
+client.on(Events.MessageCreate, async message => {
+    if (message.author.bot) return;
+    const prefix = config.bot.prefix;
+    if (!message.content.startsWith(prefix)) return;
 
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const commandName = args.shift().toLowerCase();
+    const command = client.commands.get(commandName);
+    if (!command) return;
+
+    try {
+        await command.executePrefix(message, args, client);
+    } catch (error) {
+        console.error(error);
+        message.reply('❌ Có lỗi xảy ra!');
+    }
+});
     // Handle interactions (slash commands)
     client.on(Events.InteractionCreate, async interaction => {
         if (!interaction.isChatInputCommand()) return;
